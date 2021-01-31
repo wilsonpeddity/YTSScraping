@@ -1,0 +1,116 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.alert import Alert
+from selenium.webdriver.common.action_chains import ActionChains
+import shutil
+import requests
+import urllib
+import time
+import pandas as pd
+
+options = webdriver.ChromeOptions()
+preference = {"download.default_directory": r"C:\Users\Administrator\Desktop\Scraping Pics",
+              "profile.default_content_setting_values.notifications": 2}
+options.add_experimental_option("prefs", preference)
+PATH = 'C:\Program Files (x86)\chromedriver.exe'
+driver = webdriver.Chrome(PATH, options=options)
+
+# Fill in below details
+base_url = 'https://yts.unblockit.top/browse-movies/0/all/all/6/year/0/all'
+Rating = '6+'
+page_count = 590
+
+df = pd.DataFrame(columns=['title', 'genre', 'year', 'imdb', 'desc', 'poster', 'trailer', 'x'])
+
+for x in range(348, page_count):
+
+    if x == 0:
+        driver.get(base_url)
+    elif x != 1:
+        driver.get(base_url + '?page=' + str(x))
+        time.sleep(2)
+        driver.execute_script("window.alert = null;")
+        driver.execute_script("Window.prototype.alert = null;")
+        if len(driver.window_handles) > 2:
+            z = 0
+
+            for z in range(0, 2):
+                driver.switch_to.window(driver.window_handles[z])
+            if 'https://yts.unblockit.top/' not in driver.current_url:
+                try:
+                    alert = Alert(driver)
+                    alert.dismiss()
+                except:
+                    pass
+                driver.close()
+
+    if x == 0 or x != 1:
+        driver.maximize_window()
+        try:
+            table = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'container'))
+            )
+            rows = driver.find_elements_by_class_name("browse-movie-bottom")
+            for each_row in rows:
+                ActionChains(driver) \
+                    .key_down(Keys.CONTROL) \
+                    .click(each_row) \
+                    .key_up(Keys.CONTROL) \
+                    .perform()
+                if len(driver.window_handles) > 2:
+                    z = 0
+                    for z in range(0, 2):
+                        driver.switch_to.window(driver.window_handles[z])
+                        if 'https://yts.unblockit.top/' not in driver.current_url:
+                            try:
+                                alert = Alert(driver)
+                                alert.dismiss()
+                            except:
+                                pass
+                            driver.close()
+
+
+
+                driver.switch_to.window(driver.window_handles[1])
+                try:
+                    e_title = driver.find_element_by_id('movie-info')
+                    splits = e_title.text.split('\n')
+                    title = splits[0]
+                    year = splits[1]
+                    genre = splits[2]
+                    title_fname = title.translate({ord(c): '' for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+"})
+                except:
+                    print('title error')
+                try:
+                    e_imdb = driver.find_element_by_xpath("//*[@title='IMDb Rating']")
+                    imdb = e_imdb.get_attribute('href')
+                    syn_div = driver.find_element_by_id('synopsis')
+                    splits = syn_div.text.split('\n')
+                    desc = splits[1]
+                    e_trailer = driver.find_element_by_id("playTrailer")
+                    e_trailer = e_trailer.get_attribute('href')
+                    splits = e_trailer.split('?')
+                    last_slash = splits[0].rfind('/')
+                    trailer = splits[0][last_slash + 1:]
+                except:
+                    print('imdb error')
+
+
+                e_poster = driver.find_element_by_xpath("//*[@itemprop='image']")
+                poster = e_poster.get_attribute('src')
+
+                df = df.append({'title': title, 'genre': genre, 'year': year, 'imdb': imdb, 'desc': desc,
+                                'poster': poster, 'trailer': trailer, 'x': x}, ignore_index=True)
+
+                df.to_excel(r'C:\Users\Administrator\Desktop\Scraping\yts.xlsx', index=False)
+
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+        except:
+            print('Page did not load')
+
+
+
